@@ -44,7 +44,6 @@
 //! [`Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
 //! [`Compressed`]: cached::Compressed
 //! [DCA1]: https://github.com/bwmarrin/dca
-//! [`registry::*`]: registry
 //! [`cached::*`]: cached
 //! [`OpusDecoder`]: codecs::OpusDecoder
 //! [`DcaReader`]: codecs::DcaReader
