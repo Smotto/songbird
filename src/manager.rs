@@ -154,10 +154,10 @@ impl Songbird {
     where
         G: Into<GuildId>,
     {
-        self._get_or_insert(guild_id.into())
+        self.get_or_insert_inner(guild_id.into())
     }
 
-    fn _get_or_insert(&self, guild_id: GuildId) -> Arc<Mutex<Call>> {
+    fn get_or_insert_inner(&self, guild_id: GuildId) -> Arc<Mutex<Call>> {
         self.get(guild_id).unwrap_or_else(|| {
             self.calls
                 .entry(guild_id)
@@ -235,11 +235,11 @@ impl Songbird {
         C: Into<ChannelId>,
         G: Into<GuildId>,
     {
-        self._join(guild_id.into(), channel_id.into()).await
+        self.join_inner(guild_id.into(), channel_id.into()).await
     }
 
     #[cfg(feature = "driver")]
-    async fn _join(
+    async fn join_inner(
         &self,
         guild_id: GuildId,
         channel_id: ChannelId,
@@ -277,10 +277,11 @@ impl Songbird {
         C: Into<ChannelId>,
         G: Into<GuildId>,
     {
-        self._join_gateway(guild_id.into(), channel_id.into()).await
+        self.join_gateway_inner(guild_id.into(), channel_id.into())
+            .await
     }
 
-    async fn _join_gateway(
+    async fn join_gateway_inner(
         &self,
         guild_id: GuildId,
         channel_id: ChannelId,
@@ -318,10 +319,10 @@ impl Songbird {
     /// [`remove`]: Songbird::remove
     #[inline]
     pub async fn leave<G: Into<GuildId>>(&self, guild_id: G) -> JoinResult<()> {
-        self._leave(guild_id.into()).await
+        self.leave_inner(guild_id.into()).await
     }
 
-    async fn _leave(&self, guild_id: GuildId) -> JoinResult<()> {
+    async fn leave_inner(&self, guild_id: GuildId) -> JoinResult<()> {
         if let Some(call) = self.get(guild_id) {
             let mut handler = call.lock().await;
             handler.leave().await
@@ -341,10 +342,10 @@ impl Songbird {
     /// [`Call`]: Call
     #[inline]
     pub async fn remove<G: Into<GuildId>>(&self, guild_id: G) -> JoinResult<()> {
-        self._remove(guild_id.into()).await
+        self.remove_inner(guild_id.into()).await
     }
 
-    async fn _remove(&self, guild_id: GuildId) -> JoinResult<()> {
+    async fn remove_inner(&self, guild_id: GuildId) -> JoinResult<()> {
         self.leave(guild_id).await?;
         self.calls.remove(&guild_id);
         Ok(())
@@ -476,7 +477,7 @@ pub struct Iter<'a> {
     inner: InnerIter<'a>,
 }
 
-impl<'a> Iterator for Iter<'a> {
+impl Iterator for Iter<'_> {
     type Item = (GuildId, Arc<Mutex<Call>>);
 
     fn next(&mut self) -> Option<Self::Item> {

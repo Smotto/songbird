@@ -1,4 +1,5 @@
 //! Encryption schemes supported by Discord's secure RTP negotiation.
+#[cfg(any(feature = "receive", test))]
 use super::tasks::error::Error as InternalError;
 use aead::AeadCore;
 use aes_gcm::{AeadInPlace, Aes256Gcm, KeyInit};

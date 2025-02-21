@@ -683,6 +683,7 @@ impl Mixer {
         };
 
         #[cfg(not(test))]
+        #[allow(clippy::used_underscore_items)]
         let send_status = self._send_packet(packet);
 
         send_status.or_else(Error::disarm_would_block)?;

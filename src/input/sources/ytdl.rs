@@ -192,7 +192,7 @@ impl From<YoutubeDl<'static>> for Input {
 }
 
 #[async_trait]
-impl<'a> Compose for YoutubeDl<'a> {
+impl Compose for YoutubeDl<'_> {
     fn create(&mut self) -> Result<AudioStream<Box<dyn MediaSource>>, AudioStreamError> {
         Err(AudioStreamError::Unsupported)
     }
