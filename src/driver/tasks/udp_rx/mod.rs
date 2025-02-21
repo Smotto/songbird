@@ -177,7 +177,7 @@ impl UdpRx {
                 let rtp = rtp.to_immutable();
                 let (rtp_body_start, rtp_body_tail, decrypted) = packet_data.unwrap_or_else(|| {
                     (
-                        crypto_mode.payload_prefix_len2(),
+                        crypto_mode.payload_prefix_len(),
                         crypto_mode.payload_suffix_len(),
                         false,
                     )
@@ -222,7 +222,7 @@ impl UdpRx {
 
                 let (start, tail) = packet_data.unwrap_or_else(|| {
                     (
-                        crypto_mode.payload_prefix_len2(),
+                        crypto_mode.payload_prefix_len(),
                         crypto_mode.payload_suffix_len(),
                     )
                 });

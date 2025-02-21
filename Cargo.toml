@@ -21,7 +21,7 @@ audiopus = { optional = true, version = "0.3.0-rc.0" }
 byteorder = { optional = true, version = "1" }
 bytes = { optional = true, version = "1" }
 chacha20poly1305 = { optional = true, version = "0.10.1" }
-crypto_secretbox = { optional = true, features = ["std"], version = "0.1" }
+crypto-common = { optional = true, features = ["std"], version = "0.1" }
 dashmap = { optional = true, version = "6.1.0" }
 derivative = "2"
 discortp = { default-features = false, features = [
@@ -99,7 +99,7 @@ driver = [
     "dep:byteorder",
     "dep:bytes",
     "dep:chacha20poly1305",
-    "dep:crypto_secretbox",
+    "dep:crypto-common",
     "dep:discortp",
     "dep:flume",
     "dep:nohash-hasher",

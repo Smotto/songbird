@@ -1,7 +1,7 @@
 use super::message::*;
 use crate::ws::Error as WsError;
+use aes_gcm::Error as CryptoError;
 use audiopus::Error as OpusError;
-use crypto_secretbox::aead::Error as CryptoError;
 use flume::SendError;
 use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 

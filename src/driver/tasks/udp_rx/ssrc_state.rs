@@ -87,7 +87,7 @@ impl SsrcState {
             let extensions = rtp.get_extension() != 0;
 
             let payload = rtp.payload();
-            let payload_offset = self.crypto_mode.payload_prefix_len2();
+            let payload_offset = self.crypto_mode.payload_prefix_len();
             let payload_end_pad = payload.len() - self.crypto_mode.payload_suffix_len();
 
             // We still need to compute missed packets here in case of long loss chains or similar.

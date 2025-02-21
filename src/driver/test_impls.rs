@@ -15,7 +15,6 @@ use crate::{
     test_utils,
     tracks::LoopState,
 };
-use crypto_secretbox::XSalsa20Poly1305;
 use flume::Receiver;
 use std::{io::Cursor, net::UdpSocket, sync::Arc};
 use tokio::runtime::Handle;
@@ -63,11 +62,8 @@ impl Mixer {
             .connect("127.0.0.1:5316")
             .expect("Failed to connect to local dest port.");
 
-        #[allow(deprecated)]
-        let mode = CryptoMode::Normal;
-        let cipher = mode
-            .cipher_from_key(&[0u8; XSalsa20Poly1305::KEY_SIZE])
-            .unwrap();
+        let mode = CryptoMode::Aes256Gcm;
+        let cipher = mode.cipher_from_key(&[0u8; 32]).unwrap();
         let crypto_state = mode.into();
 
         #[cfg(feature = "receive")]

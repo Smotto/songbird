@@ -554,7 +554,7 @@ impl Mixer {
                 );
 
                 let payload = rtp.payload_mut();
-                let pre_len = self.crypto_mode().payload_prefix_len2();
+                let pre_len = self.crypto_mode().payload_prefix_len();
 
                 payload[pre_len..pre_len + SILENT_FRAME.len()].copy_from_slice(&SILENT_FRAME[..]);
 
@@ -591,7 +591,7 @@ impl Mixer {
                     );
                     let payload = rtp.payload();
                     let opus_frame =
-                        (payload[self.crypto_mode().payload_prefix_len2()..][..len]).to_vec();
+                        (payload[self.crypto_mode().payload_prefix_len()..][..len]).to_vec();
 
                     OutputMessage::Passthrough(opus_frame)
                 },
@@ -637,7 +637,7 @@ impl Mixer {
 
         let payload = rtp.payload_mut();
         let crypto_mode = conn.crypto_state.kind();
-        let first_payload_byte = crypto_mode.payload_prefix_len2();
+        let first_payload_byte = crypto_mode.payload_prefix_len();
 
         // If passthrough, Opus payload in place already.
         // Else encode into buffer with space for AEAD encryption headers.
@@ -756,7 +756,7 @@ impl Mixer {
                 (Blame: VOICE_PACKET_MAX?)",
         );
         let payload = rtp.payload_mut();
-        let opus_frame = &mut payload[self.crypto_mode().payload_prefix_len2()..];
+        let opus_frame = &mut payload[self.crypto_mode().payload_prefix_len()..];
 
         // Opus frame passthrough.
         // This requires that we have only one PLAYING track, who has volume 1.0, and an
