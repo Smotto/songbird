@@ -7,7 +7,9 @@ edition = "2021"
 [dependencies]
 futures = "0.3"
 reqwest = { workspace = true }
-songbird = { workspace = true, features = ["driver", "gateway", "twilight", "rustls", "tws"] }
+# In an actual twilight project, use the "tws" feature as below.
+# songbird = { workspace = true, features = ["driver", "gateway", "twilight", "rustls", "tws"] }
+songbird = { workspace = true, features = ["driver", "gateway", "twilight", "rustls"] }
 symphonia = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, default-features = true }

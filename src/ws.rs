@@ -1,5 +1,6 @@
 use crate::{error::JsonError, model::Event};
 
+use bytes::Bytes;
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use tokio::{
     net::TcpStream,
@@ -27,12 +28,6 @@ use tokio_websockets::{
 use tracing::{debug, instrument};
 use url::Url;
 
-#[cfg(any(
-    all(feature = "tws", feature = "tungstenite"),
-    all(not(feature = "tws"), not(feature = "tungstenite"))
-))]
-compile_error!("specify one of `features = [\"tungstenite\"]` (recommended w/ serenity) or `features = [\"tws\"]` (recommended w/ twilight)");
-
 pub struct WsStream(WebSocketStream<MaybeTlsStream<TcpStream>>);
 
 impl WsStream {
@@ -41,11 +36,11 @@ impl WsStream {
         #[cfg(feature = "tungstenite")]
         let (stream, _) = tokio_tungstenite::connect_async_with_config::<Url>(
             url,
-            Some(Config {
-                max_message_size: None,
-                max_frame_size: None,
-                ..Default::default()
-            }),
+            Some(
+                Config::default()
+                    .max_message_size(None)
+                    .max_frame_size(None),
+            ),
             true,
         )
         .await?;
@@ -78,9 +73,6 @@ impl WsStream {
 
     pub(crate) async fn send_json(&mut self, value: &Event) -> Result<()> {
         let res = crate::json::to_string(value);
-        #[cfg(feature = "tungstenite")]
-        let res = res.map(Message::Text);
-        #[cfg(feature = "tws")]
         let res = res.map(Message::text);
         Ok(res.map_err(Error::from).map(|m| self.0.send(m))?.await?)
     }
@@ -94,7 +86,7 @@ pub enum Error {
 
     /// The discord voice gateway does not support or offer zlib compression.
     /// As a result, only text messages are expected.
-    UnexpectedBinaryMessage(Vec<u8>),
+    UnexpectedBinaryMessage(Bytes),
 
     #[cfg(feature = "tungstenite")]
     Ws(TungsteniteError),
@@ -102,7 +94,7 @@ pub enum Error {
     Ws(TwsError),
 
     #[cfg(feature = "tungstenite")]
-    WsClosed(Option<CloseFrame<'static>>),
+    WsClosed(Option<CloseFrame>),
     #[cfg(feature = "tws")]
     WsClosed(Option<CloseCode>),
 }
@@ -151,7 +143,7 @@ pub(crate) fn convert_ws_message(message: Option<Message>) -> Result<Option<Even
             },
         Some(message) if message.is_binary() => {
             return Err(Error::UnexpectedBinaryMessage(
-                message.into_payload().to_vec(),
+                message.into_payload().into(),
             ));
         },
         Some(message) if message.is_close() => {

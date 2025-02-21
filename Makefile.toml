@@ -19,12 +19,12 @@ command = "cargo"
 dependencies = ["format"]
 
 [tasks.build-driver]
-args = ["build", "--no-default-features", "--features", "driver,rustls"]
+args = ["build", "--no-default-features", "--features", "driver,rustls,tungstenite"]
 command = "cargo"
 dependencies = ["format"]
 
 [tasks.build-variants]
-dependencies = ["build", "build-gateway", "build-driver", "build-simd"]
+dependencies = ["build", "build-gateway", "build-driver"]
 
 [tasks.check]
 args = ["check", "--features", "full-doc"]

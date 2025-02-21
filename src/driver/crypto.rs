@@ -423,7 +423,7 @@ impl CryptoState {
 
         match self {
             Self::Suffix => {
-                rand::thread_rng().fill(&mut packet.payload_mut()[startpoint..endpoint]);
+                rand::rng().fill(&mut packet.payload_mut()[startpoint..endpoint]);
             },
             Self::Lite(ref mut i)
             | Self::Aes256Gcm(ref mut i)
