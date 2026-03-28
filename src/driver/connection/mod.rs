@@ -24,10 +24,10 @@ use crate::{
 use discortp::discord::{IpDiscoveryPacket, IpDiscoveryType, MutableIpDiscoveryPacket};
 use error::{Error, Result};
 use flume::Sender;
+use serenity_voice_model::payload::DaveMlsKeyPackage;
 use socket2::Socket;
-#[cfg(feature = "receive")]
-use std::sync::Arc;
-use std::{net::IpAddr, str::FromStr};
+use std::sync::{atomic::AtomicU16, Arc, RwLock};
+use std::{net::IpAddr, num::NonZeroU16, str::FromStr};
 use tokio::{net::UdpSocket, spawn, time::timeout};
 use tracing::{debug, info, instrument};
 use url::Url;
@@ -72,11 +72,12 @@ impl Connection {
                 session_id: info.session_id.clone(),
                 token: info.token.clone(),
                 user_id: info.user_id.into(),
+                max_dave_protocol_version: Some(davey::DAVE_PROTOCOL_VERSION),
             }))
             .await?;
 
         loop {
-            let Some(value) = client.recv_json().await? else {
+            let Some(value) = client.recv_event().await? else {
                 continue;
             };
 
@@ -181,7 +182,10 @@ impl Connection {
                 .await?;
         }
 
-        let cipher = init_cipher(&mut client, chosen_crypto, &ws_msg_tx).await?;
+        let (cipher, dave_session, dave_protocol_version) =
+            init_cipher(&mut client, &info, chosen_crypto, &ws_msg_tx).await?;
+        let dave_session = Arc::new(RwLock::new(dave_session));
+        let dave_protocol_version = Arc::new(dave_protocol_version);
 
         info!("Connected to: {}", info.endpoint);
 
@@ -213,6 +217,8 @@ impl Connection {
             cipher: cipher.clone(),
             #[cfg(not(feature = "receive"))]
             cipher,
+            dave_session: dave_session.clone(),
+            dave_protocol_version: dave_protocol_version.clone(),
             crypto_state: chosen_crypto.into(),
             #[cfg(feature = "receive")]
             udp_rx: udp_receiver_msg_tx,
@@ -237,6 +243,14 @@ impl Connection {
             hello.heartbeat_interval,
             idx,
             info.clone(),
+            #[cfg(not(feature = "receive"))]
+            dave_session,
+            #[cfg(not(feature = "receive"))]
+            dave_protocol_version,
+            #[cfg(feature = "receive")]
+            dave_session.clone(),
+            #[cfg(feature = "receive")]
+            dave_protocol_version.clone(),
             #[cfg(feature = "receive")]
             ssrc_tracker.clone(),
         );
@@ -252,6 +266,8 @@ impl Connection {
             config.clone(),
             udp_rx,
             ssrc_tracker,
+            dave_session,
+            dave_protocol_version,
         ));
 
         Ok(Connection {
@@ -290,7 +306,7 @@ impl Connection {
         let mut resumed = None;
 
         loop {
-            let Some(value) = client.recv_json().await? else {
+            let Some(value) = client.recv_event().await? else {
                 continue;
             };
 
@@ -344,11 +360,12 @@ fn generate_url(endpoint: &mut String) -> Result<Url> {
 #[inline]
 async fn init_cipher(
     client: &mut WsStream,
+    info: &ConnectionInfo,
     mode: CryptoMode,
     tx: &Sender<WsMessage>,
-) -> Result<Cipher> {
+) -> Result<(Cipher, Option<davey::DaveSession>, AtomicU16)> {
     loop {
-        let Some(value) = client.recv_json().await? else {
+        let Some(value) = client.recv_event().await? else {
             continue;
         };
 
@@ -358,9 +375,38 @@ async fn init_cipher(
                     return Err(Error::CryptoModeInvalid);
                 }
 
-                return mode
-                    .cipher_from_key(&desc.secret_key)
-                    .map_err(|_| Error::CryptoInvalidLength);
+                let dave_session =
+                    if let Some(version) = NonZeroU16::new(desc.dave_protocol_version) {
+                        let mut session = davey::DaveSession::new(
+                            version,
+                            info.user_id.0.into(),
+                            info.channel_id
+                                .expect("channel ID must be set in connection info")
+                                .0
+                                .into(),
+                            None,
+                        )
+                        .map_err(Error::DaveInitializationError)?;
+
+                        client
+                            .send_binary(&GatewayEvent::DaveMlsKeyPackage(DaveMlsKeyPackage {
+                                key_package: session
+                                    .create_key_package()
+                                    .map_err(Error::DaveCreateKeyPackageError)?,
+                            }))
+                            .await?;
+
+                        Some(session)
+                    } else {
+                        None
+                    };
+
+                return Ok((
+                    mode.cipher_from_key(&desc.secret_key)
+                        .map_err(|_| Error::CryptoInvalidLength)?,
+                    dave_session,
+                    AtomicU16::new(desc.dave_protocol_version),
+                ));
             },
             other => {
                 // Discord can and will send user-specific payload packets during this time

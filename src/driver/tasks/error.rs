@@ -2,6 +2,7 @@ use super::message::*;
 use crate::ws::Error as WsError;
 use aes_gcm::Error as CryptoError;
 use audiopus::Error as OpusError;
+use davey::errors::EncryptError as DaveyEncryptError;
 use flume::SendError;
 use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 
@@ -20,6 +21,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[non_exhaustive]
 pub enum Error {
     Crypto(CryptoError),
+    DaveEncrypt,
     #[cfg(any(feature = "receive", test))]
     /// Received an illegal voice packet on the voice UDP socket.
     IllegalVoicePacket,
@@ -55,6 +57,12 @@ impl Error {
 impl From<CryptoError> for Error {
     fn from(e: CryptoError) -> Self {
         Error::Crypto(e)
+    }
+}
+
+impl From<DaveyEncryptError> for Error {
+    fn from(_e: DaveyEncryptError) -> Self {
+        Self::DaveEncrypt
     }
 }
 
@@ -98,5 +106,45 @@ impl From<SendError<UdpRxMessage>> for Error {
 impl From<WsError> for Error {
     fn from(_: WsError) -> Error {
         Error::Other
+    }
+}
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum DaveReinitError {
+    Init,
+    Reinit,
+    Reset,
+    CreateKeyPackage,
+    Ws(WsError),
+}
+
+impl From<davey::errors::InitError> for DaveReinitError {
+    fn from(_e: davey::errors::InitError) -> Self {
+        Self::Init
+    }
+}
+
+impl From<davey::errors::ReinitError> for DaveReinitError {
+    fn from(_e: davey::errors::ReinitError) -> Self {
+        Self::Reinit
+    }
+}
+
+impl From<davey::errors::ResetError> for DaveReinitError {
+    fn from(_e: davey::errors::ResetError) -> Self {
+        Self::Reset
+    }
+}
+
+impl From<davey::errors::CreateKeyPackageError> for DaveReinitError {
+    fn from(_e: davey::errors::CreateKeyPackageError) -> Self {
+        Self::CreateKeyPackage
+    }
+}
+
+impl From<WsError> for DaveReinitError {
+    fn from(e: WsError) -> Self {
+        Self::Ws(e)
     }
 }
