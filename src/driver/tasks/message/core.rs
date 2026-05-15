@@ -23,6 +23,7 @@ pub enum CoreMessage {
     Reconnect,
     FullReconnect,
     RebuildInterconnect,
+    #[cfg(feature = "receive")]
     MarkSsrcMapped(u32),
     Poison,
 }

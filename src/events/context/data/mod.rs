@@ -16,3 +16,6 @@ use bytes::Bytes;
 pub use self::{connect::*, disconnect::*};
 #[cfg(feature = "receive")]
 pub use self::{rtcp::*, rtp::*, voice::*};
+
+/// Re-exported from serenity_voice_model for convenience.
+pub use crate::model::payload::ClientConnect;

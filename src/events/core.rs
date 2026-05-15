@@ -6,7 +6,8 @@
 ///
 /// ## Events from other users
 /// Songbird can observe when a user *speaks for the first time* ([`SpeakingStateUpdate`]),
-/// when a client leaves the session ([`ClientDisconnect`]).
+/// when a client connects to the session ([`ClientConnect`]),
+/// and when a client leaves the session ([`ClientDisconnect`]).
 ///
 /// When the `"receive"` feature is enabled, songbird can also handle voice packets
 #[cfg_attr(feature = "receive", doc = "([`RtpPacket`](Self::RtpPacket)),")]
@@ -27,9 +28,11 @@
 /// To detect when a user connects, you must correlate gateway (e.g., `VoiceStateUpdate`) events
 /// from the main part of your bot.
 ///
-/// To obtain a user's SSRC, you must use [`SpeakingStateUpdate`] events.
+/// To obtain a user's SSRC, you can use [`ClientConnect`] events (which fire on join)
+/// or [`SpeakingStateUpdate`] events (which fire on first speech).
 ///
 /// [`EventData`]: super::EventData
+/// [`ClientConnect`]: Self::ClientConnect
 /// [`SpeakingStateUpdate`]: Self::SpeakingStateUpdate
 /// [`ClientDisconnect`]: Self::ClientDisconnect
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, enum_map::Enum)]
@@ -62,6 +65,12 @@ pub enum CoreEvent {
     /// Fires on receipt of an RTCP packet, containing various call stats
     /// such as latency reports.
     RtcpPacket,
+
+    /// Fires whenever a user connects to the same stream as the bot.
+    ///
+    /// Carries `audio_ssrc` and `user_id`, providing an immediate, unambiguous
+    /// SSRC-to-user mapping that arrives before any RTP packets.
+    ClientConnect,
 
     /// Fires whenever a user disconnects from the same stream as the bot.
     ClientDisconnect,
