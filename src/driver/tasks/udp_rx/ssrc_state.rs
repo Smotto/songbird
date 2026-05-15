@@ -21,10 +21,13 @@ pub struct SsrcState {
     pub(crate) prune_time: Instant,
     pub(crate) disconnected: bool,
     channels: Channels,
+    /// Whether this SSRC has been mapped to a user via Speaking event.
+    /// Unmapped SSRCs are buffered but not decoded to avoid InvalidPacket errors.
+    mapped: bool,
 }
 
 impl SsrcState {
-    pub fn new(pkt: &RtpPacket<'_>, crypto_mode: CryptoMode, config: &Config) -> Self {
+    pub fn new(pkt: &RtpPacket<'_>, crypto_mode: CryptoMode, config: &Config, mapped: bool) -> Self {
         let playout_capacity = config.playout_buffer_length.get() + config.playout_spike_length;
         let (sample_rate, channels) = match config.decode_mode {
             DecodeMode::Decode(config) => (config.sample_rate, config.channels),
@@ -40,6 +43,7 @@ impl SsrcState {
             prune_time: Instant::now() + config.decode_state_timeout.into(),
             disconnected: false,
             channels,
+            mapped,
         }
     }
 
@@ -57,6 +61,14 @@ impl SsrcState {
     pub fn refresh_timer(&mut self, state_timeout: Duration) {
         if !self.disconnected {
             self.prune_time = Instant::now() + state_timeout;
+        }
+    }
+
+    /// Mark this SSRC as mapped to a user (Speaking event received).
+    /// Starts decoding if not already decoding.
+    pub fn mark_mapped(&mut self) {
+        if !self.mapped {
+            self.mapped = true;
         }
     }
 
@@ -91,13 +103,22 @@ impl SsrcState {
             let new_seq: u16 = rtp.get_sequence().into();
             let missed_packets = new_seq.saturating_sub(self.playout_buffer.next_seq().0);
 
-            // TODO: maybe hand over audio and extension indices alongside packet?
-            let (audio, _packet_size) = self.scan_and_decode(
-                &payload[payload_offset..payload_end_pad],
-                extensions,
-                missed_packets,
-                should_decode && decrypted,
-            )?;
+            // Skip decoding until SSRC is mapped to a user via Speaking event.
+            // This prevents InvalidPacket errors when packets arrive before
+            // Discord's Speaking event provides the user ID mapping.
+            let audio = if self.mapped {
+                let data = &payload[payload_offset..payload_end_pad];
+                let (audio, _packet_size) = self.scan_and_decode(
+                    data,
+                    extensions,
+                    missed_packets,
+                    should_decode && decrypted,
+                )?;
+                audio
+            } else {
+                // Packet is buffered but not decoded until SSRC is mapped.
+                None
+            };
 
             let rtp_data = RtpData {
                 packet,

@@ -42,6 +42,8 @@ struct UdpRx {
     decoder_map: HashMap<RtpSsrc, SsrcState>,
     config: Config,
     rx: Receiver<UdpRxMessage>,
+    /// Receives SSRC mapping signals from the Driver (via CoreMessage).
+    rx_mapped: Receiver<u32>,
     ssrc_signalling: Arc<SsrcTracker>,
     udp_socket: UdpSocket,
     dave_session: Arc<RwLock<Option<davey::DaveSession>>>,
@@ -49,6 +51,14 @@ struct UdpRx {
 }
 
 impl UdpRx {
+    /// Mark an SSRC as mapped to a user. Finds the SsrcState in decoder_map
+    /// and sets mapped=true, enabling decode on next tick.
+    fn mark_ssrc_mapped(&mut self, ssrc: RtpSsrc) {
+        if let Some(state) = self.decoder_map.get_mut(&ssrc) {
+            state.mark_mapped();
+        }
+    }
+
     #[instrument(skip(self))]
     async fn run(&mut self, interconnect: &mut Interconnect) {
         let mut cleanup_time = Instant::now();
@@ -80,6 +90,12 @@ impl UdpRx {
                                 }
                             }
                         },
+                        Err(flume::RecvError::Disconnected) => break,
+                    }
+                },
+                ssrc = self.rx_mapped.recv_async() => {
+                    match ssrc {
+                        Ok(ssrc) => self.mark_ssrc_mapped(ssrc),
                         Err(flume::RecvError::Disconnected) => break,
                     }
                 },
@@ -259,10 +275,15 @@ impl UdpRx {
                     )
                 });
 
+                let ssrc = rtp.get_ssrc();
+                // Check if this SSRC is already mapped to a user.
+                // Unmapped SSRCs (packets arriving before Speaking event) get mapped=false
+                // so they are buffered but not decoded, avoiding InvalidPacket errors.
+                let mapped = self.ssrc_signalling.ssrc_user_map.contains_key(&ssrc);
                 let entry = self
                     .decoder_map
-                    .entry(rtp.get_ssrc())
-                    .or_insert_with(|| SsrcState::new(&rtp, crypto_mode, &self.config));
+                    .entry(ssrc)
+                    .or_insert_with(|| SsrcState::new(&rtp, crypto_mode, &self.config, mapped));
 
                 // Only do this on RTP, rather than RTCP -- this pins decoder state liveness
                 // to *speech* rather than just presence.
@@ -325,6 +346,7 @@ impl UdpRx {
 pub(crate) async fn runner(
     mut interconnect: Interconnect,
     rx: Receiver<UdpRxMessage>,
+    rx_mapped: Receiver<u32>,
     cipher: Cipher,
     crypto_mode: CryptoMode,
     config: Config,
@@ -341,6 +363,7 @@ pub(crate) async fn runner(
         decoder_map: HashMap::new(),
         config,
         rx,
+        rx_mapped,
         ssrc_signalling,
         udp_socket,
         dave_session,

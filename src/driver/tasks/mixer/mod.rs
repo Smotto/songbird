@@ -346,6 +346,13 @@ impl Mixer {
                     Ok(())
                 },
             },
+            #[cfg(feature = "receive")]
+            MixerMessage::MarkSsrcMapped(ssrc) => {
+                if let Some(conn) = &self.conn_active {
+                    let _ = conn.ssrc_mapped_tx.send(ssrc);
+                }
+                Ok(())
+            },
             MixerMessage::Ws(new_ws_handle) => {
                 self.ws = new_ws_handle;
                 if let Err(e) = self.send_gateway_speaking() {

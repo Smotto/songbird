@@ -211,6 +211,9 @@ impl Connection {
             let udp_rx = UdpSocket::from_std(udp_tx.try_clone()?)?;
             (udp_rx, udp_tx)
         };
+
+        #[cfg(feature = "receive")]
+        let (ssrc_mapped_tx, ssrc_mapped_rx) = flume::unbounded();
         #[cfg(not(feature = "receive"))]
         let udp_tx = udp.into_std()?;
 
@@ -226,6 +229,8 @@ impl Connection {
             crypto_state: chosen_crypto.into(),
             #[cfg(feature = "receive")]
             udp_rx: udp_receiver_msg_tx,
+            #[cfg(feature = "receive")]
+            ssrc_mapped_tx,
             udp_tx,
         };
 
@@ -265,6 +270,7 @@ impl Connection {
         spawn(udp_rx::runner(
             interconnect.clone(),
             udp_receiver_msg_rx,
+            ssrc_mapped_rx,
             cipher,
             chosen_crypto,
             config.clone(),

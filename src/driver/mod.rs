@@ -160,6 +160,17 @@ impl Driver {
         self.send(CoreMessage::Mute(mute));
     }
 
+    /// Signal that an SSRC has been mapped to a user (Speaking event received).
+    ///
+    /// This enables decoding for previously unmapped SSRCs, preventing
+    /// InvalidPacket errors that occur when RTP packets arrive before
+    /// Discord's Speaking event provides the user ID mapping.
+    #[cfg(feature = "receive")]
+    #[instrument(skip(self))]
+    pub fn mark_ssrc_mapped(&mut self, ssrc: u32) {
+        self.send(CoreMessage::MarkSsrcMapped(ssrc));
+    }
+
     /// Returns whether the driver is muted (i.e., processes audio internally
     /// but submits none).
     #[instrument(skip(self))]

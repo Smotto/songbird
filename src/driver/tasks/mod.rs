@@ -215,6 +215,10 @@ async fn runner(mut config: Config, rx: Receiver<CoreMessage>, tx: Sender<CoreMe
             CoreMessage::RebuildInterconnect => {
                 interconnect.restart_volatile_internals();
             },
+            #[cfg(feature = "receive")]
+            CoreMessage::MarkSsrcMapped(ssrc) => {
+                drop(interconnect.mixer.send(MixerMessage::MarkSsrcMapped(ssrc)));
+            },
             CoreMessage::Poison => break,
         }
     }

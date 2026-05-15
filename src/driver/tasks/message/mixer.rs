@@ -22,6 +22,8 @@ pub struct MixerConnection {
     pub dave_protocol_version: Arc<AtomicU16>,
     #[cfg(feature = "receive")]
     pub udp_rx: Sender<UdpRxMessage>,
+    #[cfg(feature = "receive")]
+    pub ssrc_mapped_tx: Sender<u32>,
     pub udp_tx: UdpSocket,
 }
 
@@ -39,6 +41,8 @@ pub enum MixerMessage {
 
     ReplaceInterconnect(Interconnect),
     RebuildEncoder,
+    #[cfg(feature = "receive")]
+    MarkSsrcMapped(u32),
 
     Poison,
 }

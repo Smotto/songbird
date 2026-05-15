@@ -23,6 +23,7 @@ pub enum CoreMessage {
     Reconnect,
     FullReconnect,
     RebuildInterconnect,
+    MarkSsrcMapped(u32),
     Poison,
 }
 
