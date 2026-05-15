@@ -103,22 +103,14 @@ impl SsrcState {
             let new_seq: u16 = rtp.get_sequence().into();
             let missed_packets = new_seq.saturating_sub(self.playout_buffer.next_seq().0);
 
-            // Skip decoding until SSRC is mapped to a user via Speaking event.
-            // This prevents InvalidPacket errors when packets arrive before
-            // Discord's Speaking event provides the user ID mapping.
-            let audio = if self.mapped {
-                let data = &payload[payload_offset..payload_end_pad];
-                let (audio, _packet_size) = self.scan_and_decode(
-                    data,
-                    extensions,
-                    missed_packets,
-                    should_decode && decrypted,
-                )?;
-                audio
-            } else {
-                // Packet is buffered but not decoded until SSRC is mapped.
-                None
-            };
+            // Decode all packets regardless of mapping status. The `mapped` flag
+            // is only for SSRC-to-user-ID association. Unmapped packets may carry
+            // DAVE-encrypted payloads; silently skip InvalidPacket errors.
+            let data = &payload[payload_offset..payload_end_pad];
+            let audio = self.scan_and_decode(data, extensions, missed_packets, should_decode && decrypted, self.mapped)
+                .ok()
+                .map(|(a, _)| a)
+                .flatten();
 
             let rtp_data = RtpData {
                 packet,
@@ -148,12 +140,13 @@ impl SsrcState {
         extension: bool,
         missed_packets: u16,
         decode: bool,
+        log_errors: bool,
     ) -> Result<(Option<Vec<i16>>, usize)> {
         let start = if extension {
             RtpExtensionPacket::new(data)
                 .map(|pkt| pkt.packet_size())
                 .ok_or_else(|| {
-                    error!("Extension packet indicated, but insufficient space.");
+                    if log_errors { error!("Extension packet indicated, but insufficient space."); }
                     Error::IllegalVoicePacket
                 })
         } else {
@@ -192,13 +185,13 @@ impl SsrcState {
                         if self.decode_size.can_bump_up() {
                             self.decode_size = self.decode_size.bump_up();
                             out = vec![0; self.decode_size.len()];
-                        } else {
-                            error!("Received packet larger than Opus standard maximum,");
+                       } else {
+                            if log_errors { error!("Received packet larger than Opus standard maximum,"); }
                             return Err(Error::IllegalVoicePacket);
                         }
                     },
                     Err(e) => {
-                        error!("Failed to decode received packet: {:?}.", e);
+                        if log_errors { error!("Failed to decode received packet: {:?}.", e); }
                         return Err(e.into());
                     },
                 }
